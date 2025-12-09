@@ -1,0 +1,211 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Кто хочет стать миллионером?</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #e0f7fa, #ffffff);
+      height: 100vh;
+      display: flex;
+    }
+    .sidebar {
+      width: 200px;
+      background: #1a237e;
+      color: white;
+      padding: 10px;
+      display: flex;
+      flex-direction: column-reverse;
+    }
+    .level {
+      padding: 6px;
+      margin: 2px 0;
+      border-radius: 4px;
+      background: #3949ab;
+    }
+    .current-level {
+      background: #ffc107 !important;
+      color: black;
+      font-weight: bold;
+    }
+    .completed-level {
+      background: #66bb6a !important;
+    }
+    .quiz-container {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .start-screen, .question-box, .end-screen {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 500px;
+    }
+    .answers button {
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      background-color: #2196f3;
+      color: white;
+      cursor: pointer;
+    }
+    .answers button.correct { background-color: #4caf50 !important; }
+    .answers button.wrong { background-color: #f44336 !important; }
+    .answers button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #fireworks {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      color: #fff;
+      font-size: 2em;
+      display: none;
+      flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar" id="sidebar"></div>
+  <div class="quiz-container">
+    <div class="start-screen" id="startScreen">
+      <h1>Кто хочет стать миллионером?</h1>
+      <p>Готовы проверить свои знания по географии?</p>
+      <button onclick="startGame()">Начать игру</button>
+    </div>
+
+    <div class="question-box" id="quizBox" style="display:none;">
+      <h2 id="question">Загрузка вопроса...</h2>
+      <div class="answers" id="answers"></div>
+    </div>
+
+    <div class="end-screen" id="endScreen" style="display:none;">
+      <h2 id="endMessage"></h2>
+      <button onclick="location.reload()">Сыграть снова</button>
+    </div>
+  </div>
+
+  <div id="fireworks">🎉 Поздравляем! Вы выиграли миллион! 🎉</div>
+
+  <audio id="correctSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+  <audio id="wrongSound" src="https://actions.google.com/sounds/v1/cartoon/concussive_hit_guitar_boing.ogg"></audio>
+  <audio id="winSound" src="https://actions.google.com/sounds/v1/ambiences/the_big_game_winner.ogg"></audio>
+  <audio id="loseSound" src="https://actions.google.com/sounds/v1/human_voices/female_sigh.ogg"></audio>
+
+  <script>
+    const levels = [
+      '1 000 000', '500 000', '250 000', '125 000', '64 000',
+      '32 000', '16 000', '8 000', '4 000', '2 000',
+      '1 000', '500', '300', '200', '100'
+    ];
+
+    const sidebar = document.getElementById('sidebar');
+    levels.forEach((lvl, i) => {
+      const div = document.createElement('div');
+      div.className = 'level';
+      div.id = 'lvl-' + i;
+      div.textContent = `${15 - i}. ${lvl}`;
+      sidebar.appendChild(div);
+    });
+
+    let questions = [], current = 0;
+
+    async function loadQuestions() {
+      const res = await fetch('questions.json');
+      const data = await res.json();
+      questions = shuffle(data.questions).slice(0, 15);
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function startGame() {
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('quizBox').style.display = 'block';
+      showQuestion();
+    }
+
+    function showQuestion() {
+      document.querySelectorAll('.level').forEach(el => el.classList.remove('current-level', 'completed-level'));
+      document.getElementById('lvl-' + (14 - current)).classList.add('current-level');
+      const q = questions[current];
+      document.getElementById('question').textContent = q.question;
+      const shuffled = shuffle([...q.options]);
+      const correctAnswer = q.options[q.answer];
+      const answersDiv = document.getElementById('answers');
+      answersDiv.innerHTML = '';
+      shuffled.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.textContent = opt;
+        btn.onclick = () => handleAnswer(opt, correctAnswer);
+        answersDiv.appendChild(btn);
+      });
+    }
+
+    function handleAnswer(selected, correct) {
+      const btns = document.querySelectorAll('.answers button');
+      btns.forEach(btn => {
+        btn.disabled = true;
+        if (btn.textContent === correct) btn.classList.add('correct');
+        if (btn.textContent === selected && selected !== correct) btn.classList.add('wrong');
+      });
+      if (selected === correct) {
+        document.getElementById('correctSound').play();
+        document.getElementById('lvl-' + (14 - current)).classList.add('completed-level');
+        setTimeout(() => {
+          current++;
+          if (current < 15) showQuestion();
+          else showWin();
+        }, 1000);
+      } else {
+        document.getElementById('wrongSound').play();
+        setTimeout(() => showEnd(false, correct), 1500);
+      }
+    }
+
+    function showWin() {
+      document.getElementById('quizBox').style.display = 'none';
+      document.getElementById('fireworks').style.display = 'flex';
+      document.getElementById('winSound').play();
+      setTimeout(() => {
+        document.getElementById('fireworks').style.display = 'none';
+        showEnd(true);
+      }, 5000);
+    }
+
+    function showEnd(won, correctAnswer) {
+      document.getElementById('quizBox').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'block';
+      if (!won) {
+        document.getElementById('loseSound').play();
+        document.getElementById('endMessage').textContent =
+          `Неверный ответ! Правильный: ${correctAnswer}. Попробуйте снова.`;
+      } else {
+        document.getElementById('endMessage').textContent = '🎉 Вы прошли игру до конца! Поздравляем! 🎉';
+      }
+    }
+
+    loadQuestions();
+  </script>
+</body>
+</html>
