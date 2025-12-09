@@ -169,8 +169,12 @@
       '32 000', '16 000', '8 000', '4 000', '2 000',
       '1 000', '500', '300', '200', '100'
     ];
-    const totalQuestions = 15;
 
+    let questions = [];
+    let current = 0;
+    let totalQuestions = 15; // целимся в 15, но подстроимся под реальное количество
+
+    // Рисуем боковую шкалу уровней
     const sidebar = document.getElementById('sidebar');
     levels.forEach((lvl, i) => {
       const div = document.createElement('div');
@@ -179,9 +183,6 @@
       div.textContent = `${15 - i}. ${lvl}`;
       sidebar.appendChild(div);
     });
-
-    let questions = [];
-    let current = 0;
 
     function shuffle(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
@@ -194,8 +195,11 @@
     function updateStatus() {
       document.getElementById('questionCounter').textContent =
         `Вопрос ${current + 1} из ${totalQuestions}`;
-      // текущая ставка — снизу вверх (100, 200, ..., 1 000 000)
-      const prize = levels[14 - current];
+      // Ставка: снизу вверх (100 → 1 000 000)
+      let idx = 14 - current;
+      if (idx < 0) idx = 0;
+      if (idx > 14) idx = 14;
+      const prize = levels[idx];
       document.getElementById('currentPrize').textContent =
         `Ставка: ${prize} ₽`;
     }
@@ -208,11 +212,14 @@
     }
 
     function showQuestion() {
-      // подсветка уровней
+      // Подсветка уровней
       document.querySelectorAll('.level').forEach(el =>
         el.classList.remove('current-level', 'completed-level')
       );
-      document.getElementById('lvl-' + (14 - current)).classList.add('current-level');
+      let idx = 14 - current;
+      if (idx < 0) idx = 0;
+      if (idx > 14) idx = 14;
+      document.getElementById('lvl-' + idx).classList.add('current-level');
 
       const q = questions[current];
       document.getElementById('question').textContent = q.question;
@@ -242,7 +249,11 @@
 
       if (selected === correct) {
         document.getElementById('correctSound').play();
-        document.getElementById('lvl-' + (14 - current)).classList.add('completed-level');
+        let idx = 14 - current;
+        if (idx < 0) idx = 0;
+        if (idx > 14) idx = 14;
+        document.getElementById('lvl-' + idx).classList.add('completed-level');
+
         setTimeout(() => {
           current++;
           if (current < totalQuestions) {
@@ -258,4 +269,72 @@
     }
 
     function showWin() {
-      document.
+      document.getElementById('quizBox').style.display = 'none';
+      document.getElementById('fireworks').style.display = 'flex';
+      document.getElementById('winSound').play();
+      setTimeout(() => {
+        document.getElementById('fireworks').style.display = 'none';
+        showEnd(true);
+      }, 5000);
+    }
+
+    function showEnd(won, correctAnswer) {
+      document.getElementById('quizBox').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'block';
+      const msgEl = document.getElementById('endMessage');
+      if (!won) {
+        document.getElementById('loseSound').play();
+        msgEl.textContent =
+          `Неверный ответ! Правильный: ${correctAnswer}. Попробуйте снова.`;
+      } else {
+        msgEl.textContent = '🎉 Вы прошли игру до конца! Поздравляем! 🎉';
+      }
+    }
+
+    async function loadQuestions() {
+      const startBtn = document.getElementById('startBtn');
+
+      try {
+        const res = await fetch('questions.json');
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
+
+        const data = await res.json();
+        const all = data.questions;
+
+        if (!Array.isArray(all) || all.length === 0) {
+          throw new Error('В файле нет массива questions или он пустой');
+        }
+
+        questions = shuffle(all);
+        totalQuestions = Math.min(15, questions.length);
+
+        console.log(
+          'Загружено вопросов:', questions.length,
+          'будет использовано за игру:', totalQuestions
+        );
+      } catch (e) {
+        console.error('Ошибка при загрузке questions.json:', e);
+        alert('Не удалось загрузить questions.json: ' + e.message);
+
+        // Резервный один тестовый вопрос, чтобы игра не зависала
+        questions = [{
+          question: 'Файл questions.json не загрузился. Это тестовый вопрос.',
+          options: ['Вариант 1', 'Вариант 2', 'Вариант 3', 'Вариант 4'],
+          answer: 0
+        }];
+        totalQuestions = 1;
+      }
+
+      // В любом случае активируем кнопку
+      startBtn.disabled = false;
+      startBtn.textContent = 'Начать игру';
+      startBtn.onclick = startGame;
+    }
+
+    // Загружаем вопросы при открытии страницы
+    loadQuestions();
+  </script>
+</body>
+</html>
